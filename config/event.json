@@ -1,20 +1,13 @@
 {
-  "id": "comic-frontier-23",
-  "name": "Comic Frontier 23",
+  "id": "comipara-7",
+  "name": "Comipara 7",
   "series": {
-    "id": "comic-frontier",
-    "name": "Comic Frontier"
+    "id": "comipara",
+    "name": "Comipara"
   },
-  "edition": 23,
+  "edition": 7,
   "days": [
-    { "id": "2026-10-31", "label": "Saturday" },
-    { "id": "2026-11-01", "label": "Sunday" }
-  ],
-  "sourceAttendanceMap": {
-    "Both Days": ["2026-10-31", "2026-11-01"],
-    "Saturday only": ["2026-10-31"],
-    "Sunday only": ["2026-11-01"],
-    "SAT": ["2026-10-31"],
-    "SUN": ["2026-11-01"]
-  }
+    { "id": "2026-10-17", "label": "Saturday" },
+    { "id": "2026-10-18", "label": "Sunday" }
+  ]
 }

@@ -1,8 +1,12 @@
 {
   "schemaVersion": "1.0.0",
   "event": {
-    "id": "comic-frontier-23",
-    "name": "Comic Frontier 23"
+    "id": "comipara-7",
+    "name": "Comipara 7"
+  },
+  "sources": {
+    "catalog": "https://cardinal.wibuvent.com/api/v1/events/comipara-7/catalog.json",
+    "fandoms": "https://cardinal.wibuvent.com/api/v1/fandoms.json"
   },
   "catalog": "v1/catalog.json",
   "fandomRegistry": "v1/fandoms.json"
