@@ -1,4 +1,4 @@
-name: Refresh ComiPara 7 data
+name: Refresh Comipara 7 data
 
 on:
   schedule:
