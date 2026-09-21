@@ -5,12 +5,31 @@ const catalogUrl = "https://cardinal.wibuvent.com/api/v1/events/comipara-7/catal
 const fandomsUrl = "https://cardinal.wibuvent.com/api/v1/fandoms.json";
 const root = process.cwd();
 
-async function fetchJson(url: string): Promise<string> {
+interface CardinalFandom {
+  id: number;
+  name: string;
+  kind: string;
+  parentId: number | null;
+  aliases: string[];
+  alternateNames: string[];
+}
+
+interface CardinalFandoms {
+  fandoms: CardinalFandom[];
+  ignored: string[];
+}
+
+interface CardinalCatalog {
+  schemaVersion: string;
+  stats: { exhibitors: number; fandomsReferenced: number };
+  exhibitors: Array<Record<string, unknown>>;
+}
+
+async function fetchJson<T>(url: string): Promise<{ body: string; value: T }> {
   const response = await fetch(url, { signal: AbortSignal.timeout(60_000) });
   if (!response.ok) throw new Error(`${url} returned HTTP ${response.status}: ${await response.text()}`);
   const body = await response.text();
-  JSON.parse(body);
-  return body.endsWith("\n") ? body : `${body}\n`;
+  return { body: body.endsWith("\n") ? body : `${body}\n`, value: JSON.parse(body) as T };
 }
 
 async function writeAtomic(file: string, body: string): Promise<void> {
@@ -20,12 +39,53 @@ async function writeAtomic(file: string, body: string): Promise<void> {
   await rename(temporary, file);
 }
 
-const [catalog, fandoms] = await Promise.all([fetchJson(catalogUrl), fetchJson(fandomsUrl)]);
+const [{ body: rawCatalog, value: cardinalCatalog }, { body: rawFandoms, value: cardinalFandoms }] = await Promise.all([
+  fetchJson<CardinalCatalog>(catalogUrl),
+  fetchJson<CardinalFandoms>(fandomsUrl),
+]);
+const downloadedAt = new Date().toISOString();
+const fandomSource = {
+  url: fandomsUrl,
+  etag: null,
+  lastModified: null,
+  schemaVersion: "1.0.0",
+};
 
-await writeAtomic(path.join(root, "data/raw/catalog.json"), catalog);
-await writeAtomic(path.join(root, "data/raw/fandoms.json"), fandoms);
-await writeAtomic(path.join(root, "public/v1/catalog.json"), catalog);
-await writeAtomic(path.join(root, "public/v1/fandoms.json"), fandoms);
+const catalog = {
+  schemaVersion: "1.0.0",
+  sources: {
+    catalog: { url: catalogUrl, downloadedAt },
+    fandomDirectory: fandomSource,
+  },
+  event: {
+    id: "comipara-7",
+    name: "Comipara 7",
+    series: { id: "comipara", name: "Comipara" },
+    edition: 7,
+    days: [
+      { id: "2026-10-17", label: "Saturday" },
+      { id: "2026-10-18", label: "Sunday" },
+    ],
+  },
+  stats: cardinalCatalog.stats,
+  exhibitors: cardinalCatalog.exhibitors,
+};
+const fandoms = {
+  schemaVersion: "1.0.0",
+  source: fandomSource,
+  fandoms: cardinalFandoms.fandoms.map(({ id, name, kind, parentId, alternateNames }) => ({
+    id,
+    name,
+    kind,
+    parentId,
+    alternateNames,
+  })),
+};
+
+await writeAtomic(path.join(root, "data/raw/catalog.json"), rawCatalog);
+await writeAtomic(path.join(root, "data/raw/fandoms.json"), rawFandoms);
+await writeAtomic(path.join(root, "public/v1/catalog.json"), `${JSON.stringify(catalog)}\n`);
+await writeAtomic(path.join(root, "public/v1/fandoms.json"), `${JSON.stringify(fandoms)}\n`);
 
 const previousLastUpdated = await readFile(path.join(root, "public/last-updated.json"), "utf8")
   .then((value) => JSON.parse(value) as Record<string, unknown>)
@@ -39,7 +99,7 @@ await writeAtomic(path.join(root, "public/manifest.json"), `${JSON.stringify({
 }, null, 2)}\n`);
 await writeAtomic(path.join(root, "public/last-updated.json"), `${JSON.stringify({
   ...previousLastUpdated,
-  lastUpdated: new Date().toISOString(),
+  lastUpdated: downloadedAt,
 }, null, 2)}\n`);
 
 console.log("Published Cardinal catalog and fandoms for Comipara 7.");
