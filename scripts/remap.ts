@@ -26,10 +26,22 @@ interface CardinalCatalog {
 }
 
 async function fetchJson<T>(url: string): Promise<{ body: string; value: T }> {
-  const response = await fetch(url, { signal: AbortSignal.timeout(60_000) });
-  if (!response.ok) throw new Error(`${url} returned HTTP ${response.status}: ${await response.text()}`);
-  const body = await response.text();
-  return { body: body.endsWith("\n") ? body : `${body}\n`, value: JSON.parse(body) as T };
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      const response = await fetch(url, {
+        headers: { Accept: "application/json" },
+        signal: AbortSignal.timeout(180_000),
+      });
+      if (!response.ok) throw new Error(`${url} returned HTTP ${response.status}: ${await response.text()}`);
+      const body = await response.text();
+      return { body: body.endsWith("\n") ? body : `${body}\n`, value: JSON.parse(body) as T };
+    } catch (error) {
+      lastError = error;
+      if (attempt < 3) await new Promise((resolve) => setTimeout(resolve, attempt * 5_000));
+    }
+  }
+  throw lastError;
 }
 
 async function writeAtomic(file: string, body: string): Promise<void> {
