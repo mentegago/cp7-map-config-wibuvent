@@ -25,6 +25,12 @@ interface CardinalCatalog {
   exhibitors: Array<Record<string, unknown>>;
 }
 
+interface ExhibitorIdMap {
+  schemaVersion: 1;
+  nextId: number;
+  ids: Record<string, string>;
+}
+
 async function fetchJson<T>(url: string): Promise<{ body: string; value: T }> {
   let lastError: unknown;
   for (let attempt = 1; attempt <= 3; attempt += 1) {
@@ -51,10 +57,37 @@ async function writeAtomic(file: string, body: string): Promise<void> {
   await rename(temporary, file);
 }
 
+async function readIdMap(file: string): Promise<ExhibitorIdMap> {
+  try {
+    const value = JSON.parse(await readFile(file, "utf8")) as Partial<ExhibitorIdMap>;
+    if (value.schemaVersion !== 1 || typeof value.nextId !== "number" || !value.ids) throw new Error("invalid map");
+    return { schemaVersion: 1, nextId: value.nextId, ids: value.ids };
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") {
+      return { schemaVersion: 1, nextId: 1, ids: {} };
+    }
+    throw error;
+  }
+}
+
 const [{ body: rawCatalog, value: cardinalCatalog }, { body: rawFandoms, value: cardinalFandoms }] = await Promise.all([
   fetchJson<CardinalCatalog>(catalogUrl),
   fetchJson<CardinalFandoms>(fandomsUrl),
 ]);
+const exhibitorIdMapPath = path.join(root, "data/raw/exhibitor-id-map.json");
+const exhibitorIdMap = await readIdMap(exhibitorIdMapPath);
+const sortedNewIds = cardinalCatalog.exhibitors
+  .map((exhibitor) => String(exhibitor.id))
+  .filter((id) => !exhibitorIdMap.ids[id])
+  .sort();
+for (const sourceId of sortedNewIds) {
+  exhibitorIdMap.ids[sourceId] = String(exhibitorIdMap.nextId);
+  exhibitorIdMap.nextId += 1;
+}
+const exhibitors = cardinalCatalog.exhibitors.map((exhibitor) => ({
+  ...exhibitor,
+  id: exhibitorIdMap.ids[String(exhibitor.id)],
+}));
 const downloadedAt = new Date().toISOString();
 const fandomSource = {
   url: fandomsUrl,
@@ -80,7 +113,7 @@ const catalog = {
     ],
   },
   stats: cardinalCatalog.stats,
-  exhibitors: cardinalCatalog.exhibitors,
+  exhibitors,
 };
 const fandoms = {
   schemaVersion: "1.0.0",
@@ -96,6 +129,7 @@ const fandoms = {
 
 await writeAtomic(path.join(root, "data/raw/catalog.json"), rawCatalog);
 await writeAtomic(path.join(root, "data/raw/fandoms.json"), rawFandoms);
+await writeAtomic(path.join(root, "data/raw/exhibitor-id-map.json"), `${JSON.stringify(exhibitorIdMap, null, 2)}\n`);
 await writeAtomic(path.join(root, "public/v1/catalog.json"), `${JSON.stringify(catalog)}\n`);
 await writeAtomic(path.join(root, "public/v1/fandoms.json"), `${JSON.stringify(fandoms)}\n`);
 
