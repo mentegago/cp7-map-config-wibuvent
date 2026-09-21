@@ -27,6 +27,7 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun run typecheck
       - run: bun run build
+      - run: bun run verify:schema
       - name: Commit refreshed Cardinal data
         run: |
           if [ -z "$(git status --porcelain -- data public)" ]; then

@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "bun run scripts/remap.ts",
+    "verify:schema": "bun run scripts/verify-schema.ts",
     "snapshot:catalog": "bun run scripts/download-catalog.ts",
     "test": "bun test",
     "typecheck": "tsc --noEmit"
